@@ -28,11 +28,14 @@ La différence entre une signature correcte et la notre vient de cet arrondi au 
 
 On pourrait imaginer faire la même chose (racine puis ceil) avec le bloc qui passe une vérification stricte (le bon nombre de padding FF), mais quand on cube notre signature forgée, l'erreur d'arrondi supérieur change les derniers bits du bloc EM (qui correspondent à des bits du hash du message) et la vérification échoue.
 
-Au lieu de ça, dans notre cas l'erreur d'arrondi va se trouver seulement sur des bits non vérifiés parce que la fonction de vérification aura déja trouvé tous les octets qu'elle cherchait.
+Au lieu de ça, dans notre cas l'erreur d'arrondi va se trouver seulement sur des bits non vérifiés parce que la fonction de vérification aura déja trouvé tous les octets qu'elle cherchait. Précision sur l'erreur d'arrondi: 
+$s=\lceil\sqrt[3]{EM}\rceil$ et $s^3=EM+\Delta$ avec $\Delta\approx 3EM^{2/3}.$ Pour une clé de 2048 bits, $EM\approx 2^{2033}$ (expliqué plus bas), donc $3EM^{2/3}\approx 2^{1357}$ et $1357/8 \approx 170$  
+Donc l'erreur d'arrondi ce propage sur environ 170 octets avec e=3 
+
 
 Dans le cas d'une clé RSA 2048 bits, on a à peu près 200 octets de marge non vérifiés (ça dépends de l'implémentation fautive), donc la signature forgée est accéptée à tous les coups.
 
-Il y a aussi la partie $\pmod n$ de la formule qui pourrait ruiner la structure de notre bloc EM si $s^3 > n$. Cependant, RSA garantit que $2^{2047}<n<2^{2048}$ pour une clé de 2048 bits, et on sait que EM commence par 0001, donc $EM<2^{2045}<n$. Même si $s^3$ est un peu plus grand que EM, il ne peut pas être plus grand que n.
+Il y a aussi la partie $\pmod n$ de la formule qui pourrait ruiner la structure de notre bloc EM si $s^3 > n$. Cependant, RSA garantit que $2^{2047}<n<2^{2048}$ pour une clé de 2048 bits, et on sait que EM commence par 0001, donc $EM<2^{2033}<n$. Même si $s^3$ est un peu plus grand que EM, il ne peut pas être plus grand que n.
 
 Cette attaque fonctionne seulement pour des (e) très petit. Déja à partir de e=5, l'erreur d'arrondi après l'étape $EM' = s^e \pmod n$ est supérieure au nombre d'octets non vérifiés, donc l'attaque échoue.
 
