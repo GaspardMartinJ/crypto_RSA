@@ -25,11 +25,17 @@ def vulnPkcs1Check(em: bytes, expected_hash: bytes) -> bool:
     third_byte = em[2]
 
     starts_ok = first_byte == 0x00 and second_byte == 0x01 and third_byte == 0xFF
+    if not starts_ok:
+        return False
 
-    # Vulnérabilité ici: on ne vérifie pas tous les octets FF de padding
-    ends_ok = em[-len(expected_hash) - 1 :] == bytes([0x00]) + expected_hash
+    # Vulnérabilité ici: on vérifie seulement que 0x00 et le hash sont 
+    # présents après le bloc de départ, mais pas leurs positions exactes
+    zero_index = em.find(b"\x00", 3)
+    if zero_index == -1:
+        return False
 
-    return starts_ok and ends_ok
+    hash_index = em.find(expected_hash, zero_index + 1)
+    return hash_index != -1
 
 
 def save_keypair_to_file(file_path: str, key: RSA.RsaKey) -> None:
@@ -50,7 +56,7 @@ def sign_message(message: bytes, n: int, d: int) -> bytes:
     suffix = b"\x00" + expected_hash
     middle_len = k - len(prefix) - len(suffix)
 
-    em = prefix + (b"\x00" * middle_len) + suffix
+    em = prefix + (b"\xff" * middle_len) + suffix
     m = int.from_bytes(em, byteorder="big")
 
     signature_int = pow(m, d, n)
