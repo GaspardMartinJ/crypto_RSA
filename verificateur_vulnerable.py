@@ -37,6 +37,26 @@ def vulnPkcs1Check(em: bytes, expected_hash: bytes) -> bool:
     hash_index = em.find(expected_hash, zero_index + 1)
     return hash_index != -1
 
+def strictPkcs1Check(em: bytes, expected_hash: bytes) -> bool:
+    k = len(em)
+    h_len = len(expected_hash)
+
+    if k < 3 + h_len + 1:
+        return False
+
+    if em[0] != 0x00 or em[1] != 0x01:
+        return False
+
+    padding_len = k - 3 - h_len
+    if any(byte != 0xFF for byte in em[2 : 2 + padding_len]):
+        return False
+
+    separator_index = 2 + padding_len
+    if em[separator_index] != 0x00:
+        return False
+
+    return em[separator_index + 1 :] == expected_hash
+
 
 def save_keypair_to_file(file_path: str, key: RSA.RsaKey) -> None:
     data = {"n": str(key.n), "e": key.e, "d": str(key.d)}
@@ -74,6 +94,16 @@ def verify_signature_vulnerable(
 
     return vulnPkcs1Check(em, expected_hash)
 
+def verify_signature_strict(
+    message: bytes,
+    signature: bytes,
+    n: int,
+    e: int = PUBLIC_EXPONENT,
+) -> bool:
+    expected_hash = SHA256.new(message).digest()
+    em = rsavp1(signature, n, e)
+
+    return strictPkcs1Check(em, expected_hash)
 
 def main(
     message: str = "message",

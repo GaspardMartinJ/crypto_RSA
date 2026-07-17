@@ -1,15 +1,11 @@
-import json
-from pathlib import Path
 import gmpy2
 from Crypto.Hash import SHA256
 from verificateur_vulnerable import (
     PUBLIC_EXPONENT,
+    load_keypair_from_file,
     verify_signature_vulnerable,
+    verify_signature_strict
 )
-
-def load_public_key(file_path: str) -> tuple[int, int]:
-    data = json.loads(Path(file_path).read_text(encoding="utf-8"))
-    return int(data["n"]), int(data["e"])
 
 def build_lower_bound_block(
     message_bytes: bytes, k: int
@@ -51,7 +47,7 @@ def forge_signature(
     return s.to_bytes(k, byteorder="big")
 
 def main() -> None:
-    n, e = load_public_key("public_key.json")
+    n, e, _ = load_keypair_from_file("rsa_key.json")
 
     message = "Salut c'est alice, transfère moi 1000€"
     message_bytes = message.encode()
@@ -61,6 +57,9 @@ def main() -> None:
 
     ok = verify_signature_vulnerable(message_bytes, forged_signature, n, e)
     print("Le vérificateur vulnérable accepte la signature forgée:", ok)
+    
+    ok_strict = verify_signature_strict(message_bytes, forged_signature, n, e)
+    print("Le vérificateur strict accepte la signature forgée:", ok_strict)
 
 if __name__ == "__main__":
     main()
