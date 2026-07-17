@@ -4,7 +4,10 @@ from pathlib import Path
 from Crypto.Hash import SHA256
 from Crypto.PublicKey import RSA
 
-PUBLIC_EXPONENT = 3
+PUBLIC_EXPONENT = 5
+
+# https://www.rfc-editor.org/info/rfc8017/#section-9.2
+SHA256_DIGESTINFO_PREFIX = bytes.fromhex("3031300d060960864801650304020105000420")
 
 
 def rsavp1(signature: bytes, n: int, e: int) -> bytes:
@@ -17,8 +20,13 @@ def rsavp1(signature: bytes, n: int, e: int) -> bytes:
     return em
 
 
-def vulnPkcs1Check(em: bytes, expected_hash: bytes) -> bool:
-    # PKCS#1 v1.5 signature: 0x00 0x01 0xFF...0xFF 0x00 hash
+def build_digest_info_sha256(message: bytes) -> bytes:
+    digest = SHA256.new(message).digest()
+    return SHA256_DIGESTINFO_PREFIX + digest
+
+
+def vulnPkcs1Check(em: bytes, expected_digest_info: bytes) -> bool:
+    # PKCS#1 v1.5 signature: 0x00 0x01 0xFF...0xFF 0x00 ASN.1(hash)
 
     first_byte = em[0]
     second_byte = em[1]
@@ -34,20 +42,23 @@ def vulnPkcs1Check(em: bytes, expected_hash: bytes) -> bool:
     if zero_index == -1:
         return False
 
-    hash_index = em.find(expected_hash, zero_index + 1)
-    return hash_index != -1
+    digest_info_index = em.find(expected_digest_info, zero_index + 1)
+    return digest_info_index != -1
 
-def strictPkcs1Check(em: bytes, expected_hash: bytes) -> bool:
+def strictPkcs1Check(em: bytes, expected_digest_info: bytes) -> bool:
     k = len(em)
-    h_len = len(expected_hash)
+    t_len = len(expected_digest_info)
 
-    if k < 3 + h_len + 1:
+    if k < 3 + t_len + 1:
         return False
 
     if em[0] != 0x00 or em[1] != 0x01:
         return False
 
-    padding_len = k - 3 - h_len
+    padding_len = k - 3 - t_len
+    if padding_len < 8:
+        return False
+
     if any(byte != 0xFF for byte in em[2 : 2 + padding_len]):
         return False
 
@@ -55,7 +66,7 @@ def strictPkcs1Check(em: bytes, expected_hash: bytes) -> bool:
     if em[separator_index] != 0x00:
         return False
 
-    return em[separator_index + 1 :] == expected_hash
+    return em[separator_index + 1 :] == expected_digest_info
 
 
 def save_keypair_to_file(file_path: str, key: RSA.RsaKey) -> None:
@@ -69,11 +80,11 @@ def load_keypair_from_file(file_path: str) -> tuple[int, int, int]:
 
 
 def sign_message(message: bytes, n: int, d: int) -> bytes:
-    expected_hash = SHA256.new(message).digest()
+    digest_info = build_digest_info_sha256(message)
     k = (n.bit_length() + 7) // 8
 
     prefix = b"\x00\x01\xff"
-    suffix = b"\x00" + expected_hash
+    suffix = b"\x00" + digest_info
     middle_len = k - len(prefix) - len(suffix)
 
     em = prefix + (b"\xff" * middle_len) + suffix
@@ -89,10 +100,10 @@ def verify_signature_vulnerable(
     n: int,
     e: int = PUBLIC_EXPONENT,
 ) -> bool:
-    expected_hash = SHA256.new(message).digest()
+    expected_digest_info = build_digest_info_sha256(message)
     em = rsavp1(signature, n, e)
 
-    return vulnPkcs1Check(em, expected_hash)
+    return vulnPkcs1Check(em, expected_digest_info)
 
 def verify_signature_strict(
     message: bytes,
@@ -100,10 +111,10 @@ def verify_signature_strict(
     n: int,
     e: int = PUBLIC_EXPONENT,
 ) -> bool:
-    expected_hash = SHA256.new(message).digest()
+    expected_digest_info = build_digest_info_sha256(message)
     em = rsavp1(signature, n, e)
 
-    return strictPkcs1Check(em, expected_hash)
+    return strictPkcs1Check(em, expected_digest_info)
 
 def main(
     message: str = "message",

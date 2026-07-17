@@ -1,7 +1,7 @@
 import gmpy2
-from Crypto.Hash import SHA256
 from verificateur_vulnerable import (
     PUBLIC_EXPONENT,
+    build_digest_info_sha256,
     load_keypair_from_file,
     verify_signature_vulnerable,
     verify_signature_strict
@@ -10,9 +10,9 @@ from verificateur_vulnerable import (
 def build_lower_bound_block(
     message_bytes: bytes, k: int
 ) -> tuple[int, int]:
-    h = SHA256.new(message_bytes).digest()
+    digest_info = build_digest_info_sha256(message_bytes)
     # Le bloc minimal qui passe la vérification
-    fixed = b"\x00\x01\xFF" + b"\x00" + h
+    fixed = b"\x00\x01\xFF" + b"\x00" + digest_info
     garbage_len = k - len(fixed)
     # On remplit reste de 0
     b_low = int.from_bytes(fixed, byteorder="big") << (garbage_len * 8)
