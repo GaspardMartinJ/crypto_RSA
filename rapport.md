@@ -10,7 +10,9 @@ Ensuite: le DigestInfo ASN.1(H) est le préfixe désignant l'algorithme de hash 
 Enfin: le hash du message (32 octets)
 
 On signe avec RSA: 
-$$s = EM^d \pmod n$$
+$$
+s = EM^d \pmod n
+$$
 avec s la signature, EM le bloc décrit au dessus, d l'exposant privé RSA et n le modulo RSA public.
 
 Pour vérifier la signature, on fait l'opération inverse:
@@ -35,7 +37,7 @@ Donc l'erreur d'arrondi ce propage sur environ 170 octets avec e=3
 
 Dans le cas d'une clé RSA 2048 bits, on a à peu près 200 octets de marge non vérifiés (ça dépends de l'implémentation fautive), donc la signature forgée est accéptée à tous les coups.
 
-Il y a aussi la partie $\pmod n$ de la formule qui pourrait ruiner la structure de notre bloc EM si $s^3 > n$. Cependant, RSA garantit que $2^{2047}<n<2^{2048}$ pour une clé de 2048 bits, et on sait que EM commence par 0001, donc $EM<2^{2033}<n$. Même si $s^3$ est un peu plus grand que EM, il ne peut pas être plus grand que n.
+Il y a aussi la partie $\pmod n$ de la formule qui pourrait ruiner la structure de notre bloc EM si $s^3 > n$. Cependant, RSA garantit que $2^{2047}<n<2^{2048}$ pour une clé de 2048 bits, et on sait que EM commence par 00 01, donc $EM<2^{2033}<n$. Même si $s^3$ est un peu plus grand que EM, il ne peut pas être plus grand que n.
 
 Cette attaque fonctionne seulement pour des (e) très petit. Déja à partir de e=5, l'erreur d'arrondi après l'étape $EM' = s^e \pmod n$ est supérieure au nombre d'octets non vérifiés, donc l'attaque échoue.
 
